@@ -484,8 +484,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   // 三角形用
   Vector3 translate{};
   Vector3 rotate{};
-  Vector3 cameraPosition{0.0f, 0.0f, 0.0f};
-  Vector3 kLocalVertices[3];
+  Vector3 cameraPosition{0.0f, 0.0f, -10.0f};
+  Vector3 kLocalVertices[3] = {
+      {-1.0f, -1.0f, 0.0f},
+      {1.0f, -1.0f, 0.0f},
+      {0.0f, 1.0f, 0.0f},
+  };
 
   // ウィンドウの×ボタンが押されるまでループ
   while (Novice::ProcessMessage() == 0) {
@@ -502,16 +506,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     // 移動処理
     if (keys[DIK_W]) {
-      translate.z++;
+      translate.z += 0.1f;
     } else if (keys[DIK_S]) {
-      translate.z--;
+      translate.z -= 0.1f;
     }
 
     if (keys[DIK_A]) {
-      translate.x--;
+      translate.x -= 0.1f;
     } else if (keys[DIK_D]) {
-      translate.x++;
+      translate.x += 0.1f;
     }
+
+    rotate.y += 0.05f;
 
     Matrix4x4 worldMatrix =
         MakeAffineMatrix({1.0f, 1.0f, 1.0f}, rotate, translate);
@@ -530,7 +536,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     for (uint32_t i = 0; i < 3; ++i) {
       Vector3 ndcVertex =
           Transform(kLocalVertices[i], worldViewProjectionMatrix);
-      screenVertices[i] = Transform(ndcVertex, viewMatrix);
+      screenVertices[i] = Transform(ndcVertex, viewportMatrix);
     }
 
     ///
