@@ -114,7 +114,7 @@ Vector3 Transform(const Vector3 &vector, const Matrix4x4 &matrix) {
   float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] +
             vector.z * matrix.m[2][3] + 1.0f * matrix.m[3][3];
 
-  assert(w != 0);
+  assert(w != 0.0f);
   result.x /= w;
   result.y /= w;
   result.z /= w;
@@ -405,7 +405,7 @@ Matrix4x4 MakeOrthographicMatrix(float left, float top, float right,
   matrix.m[1][3] = 0.0f;
   matrix.m[2][0] = 0.0f;
   matrix.m[2][1] = 0.0f;
-  matrix.m[2][2] = 1.0f / (farClip / nearClip);
+  matrix.m[2][2] = 1.0f / (farClip - nearClip);
   matrix.m[2][3] = 0.0f;
   matrix.m[3][0] = (left + right) / (left - right);
   matrix.m[3][1] = (top + bottom) / (bottom - top);
@@ -482,9 +482,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   Vector3 cross = Cross(v1, v2);
 
   // 三角形用
-  Vector3 translate{};
-  Vector3 rotate{};
-  Vector3 cameraPosition{0.0f, 0.0f, -10.0f};
+  Vector3 translate{0.0f, 0.0f, 10.0f};
+  Vector3 rotate{0.0f, 0.0f, 0.0f};
+  Vector3 cameraPosition{0.0f, 0.0f, 0.0f};
   Vector3 kLocalVertices[3] = {
       {-1.0f, -1.0f, 0.0f},
       {1.0f, -1.0f, 0.0f},
@@ -504,19 +504,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     /// ↓更新処理ここから
     ///
 
-    // 移動処理
+    // 前後移動
     if (keys[DIK_W]) {
       translate.z += 0.1f;
     } else if (keys[DIK_S]) {
       translate.z -= 0.1f;
     }
 
+    // 左右移動
     if (keys[DIK_A]) {
       translate.x -= 0.1f;
     } else if (keys[DIK_D]) {
       translate.x += 0.1f;
     }
 
+    // Y軸で回転
     rotate.y += 0.05f;
 
     Matrix4x4 worldMatrix =
