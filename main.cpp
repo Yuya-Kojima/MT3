@@ -565,6 +565,66 @@ void DrawSphere(const Sphere &sphere, const Matrix4x4 &viewProjectionMatrix,
   }
 }
 
+/// <summary>
+/// ベクトルの引き算
+/// </summary>
+/// <param name="v1"></param>
+/// <param name="v2"></param>
+/// <returns></returns>
+Vector3 Subtract(const Vector3 &v1, const Vector3 &v2) {
+
+  Vector3 result;
+
+  result.x = v1.x - v2.x;
+  result.y = v1.y - v2.y;
+  result.z = v1.z - v2.z;
+
+  return result;
+}
+
+/// <summary>
+/// 内積を求める
+/// </summary>
+/// <param name="v1"></param>
+/// <param name="v2"></param>
+/// <returns></returns>
+float Dot(const Vector3 &v1, const Vector3 &v2) {
+  float result;
+
+  result = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+
+  return result;
+}
+
+/// <summary>
+/// 長さを求める
+/// </summary>
+/// <param name="vector"></param>
+/// <returns></returns>
+float Length(const Vector3 &vector) {
+  float result;
+
+  result = sqrtf(Dot(vector, vector));
+
+  return result;
+}
+
+/// <summary>
+/// 球の当たり判定
+/// </summary>
+/// <param name="s1"></param>
+/// <param name="s2"></param>
+/// <returns></returns>
+bool IsCollision(const Sphere &s1, const Sphere &s2) {
+
+  float distance = Length(Subtract(s2.center, s1.center));
+
+  if (distance <= s1.radius + s2.radius) {
+    return true;
+  }
+  return false;
+}
+
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
@@ -581,11 +641,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   Vector3 cameraTranslate{0.0f, 1.9f, -6.49f};
   Vector3 cameraRotate{0.26f, 0.0f, 0.0f};
 
+  // 球の色
   uint32_t color = 0x000000ff;
 
-  Sphere sphere = {
-      {0.0f, 0.0f, 0.0f},
-      0.5f,
+  Sphere sphere[2] = {
+
+      {
+          // 一つ目(動かす方)
+          {0.0f, 0.0f, 0.0f},
+          0.5f,
+      },
+
+      {
+          // 二つ目
+          {1.0f, 0.0f, 0.0f},
+          {0.5f},
+      },
   };
 
   // ウィンドウの×ボタンが押されるまでループ
@@ -610,6 +681,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Matrix4x4 viewportMatrix = MakeViewportMatrix(
         0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
+    // 当たり判定を取る
+    // trueなら赤色にする
+    // falseなら白色
+    if (IsCollision(sphere[0], sphere[1])) {
+      color = 0xff0000ff;
+    } else {
+      color = 0xffffffff;
+    }
+
     ///
     /// ↑更新処理ここまで
     ///
@@ -618,15 +698,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     /// ↓描画処理ここから
     ///
 
+    // グリッド
     DrawGlid(viewProjectionMatrix, viewportMatrix);
 
-    DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, color);
+    // 動かす方の球
+    DrawSphere(sphere[0], viewProjectionMatrix, viewportMatrix, color);
 
+    // 固定されてる球
+    DrawSphere(sphere[1], viewProjectionMatrix, viewportMatrix, 0xffffffff);
+
+    // UI
     ImGui::Begin("Window");
     ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
     ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-    ImGui::DragFloat3("SphereCenter", &sphere.center.x, 0.01f);
-    ImGui::DragFloat("SphereRadius", &sphere.radius, 0.01f);
+    ImGui::DragFloat3("SphereTranslate", &sphere[0].center.x, 0.01f);
+    ImGui::DragFloat("SphereRadius", &sphere[0].radius, 0.01f);
     ImGui::End();
 
     ///
