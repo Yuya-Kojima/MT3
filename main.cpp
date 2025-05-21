@@ -22,6 +22,11 @@ struct Sphere {
   float radius;
 };
 
+struct Plane {
+  Vector3 normal;
+  float distance;
+};
+
 // 行列の積
 Matrix4x4 Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 
@@ -414,6 +419,102 @@ Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height,
 }
 
 /// <summary>
+/// ベクトルの足し算
+/// </summary>
+/// <param name="v1"></param>
+/// <param name="v2"></param>
+/// <returns></returns>
+Vector3 Add(const Vector3 &v1, const Vector3 &v2) {
+
+  Vector3 result;
+
+  result.x = v1.x + v2.x;
+  result.y = v1.y + v2.y;
+  result.z = v1.z + v2.z;
+
+  return result;
+}
+
+/// <summary>
+/// 内積を求める
+/// </summary>
+/// <param name="v1"></param>
+/// <param name="v2"></param>
+/// <returns></returns>
+float Dot(const Vector3 &v1, const Vector3 &v2) {
+  float result;
+
+  result = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+
+  return result;
+}
+
+/// <summary>
+/// 長さを求める
+/// </summary>
+/// <param name="vector"></param>
+/// <returns></returns>
+float Length(const Vector3 &vector) {
+  float result;
+
+  result = sqrtf(Dot(vector, vector));
+
+  return result;
+}
+
+/// <summary>
+/// 外積
+/// </summary>
+/// <param name="v1"></param>
+/// <param name="v2"></param>
+/// <returns></returns>
+Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
+
+  Vector3 result;
+
+  result.x = v1.y * v2.z - v1.z * v2.y;
+  result.y = v1.z * v2.x - v1.x * v2.z;
+  result.z = v1.x * v2.y - v1.y * v2.x;
+
+  return result;
+}
+
+/// <summary>
+/// Vector3とfloatの積を求める
+/// </summary>
+/// <param name="f"></param>
+/// <param name="vector"></param>
+/// <returns></returns>
+Vector3 Multiply(const float &f, const Vector3 vector) {
+
+  Vector3 result;
+
+  result = {vector.x * f, vector.y * f, vector.z * f};
+
+  return result;
+}
+
+Vector3 Perpendicular(const Vector3 &vector) {
+
+  if (vector.x != 0.0f || vector.y != 0.0f) {
+    return {-vector.y, vector.x, 0.0f};
+  }
+
+  return {0.0f, -vector.z, vector.y};
+}
+
+Vector3 Normalize(const Vector3 &vector) {
+
+  float length = Length(vector);
+
+  Vector3 result;
+
+  result = {vector.x / length, vector.y / length, vector.z / length};
+
+  return result;
+}
+
+/// <summary>
 /// Gridを描画する
 /// </summary>
 /// <param name="viewProjectionMatrix">ビュー射影行列</param>
@@ -566,6 +667,65 @@ void DrawSphere(const Sphere &sphere, const Matrix4x4 &viewProjectionMatrix,
 }
 
 /// <summary>
+/// 平面の描画
+/// </summary>
+/// <param name="plane">平面</param>
+/// <param name="viewProjectionMatrix">ビュー射影行列</param>
+/// <param name="viewMatrix">ビューポート行列</param>
+/// <param name="color">色</param>
+void DrawPlane(const Plane &plane, const Matrix4x4 &viewProjectionMatrix,
+               const Matrix4x4 &viewportMatrix, uint32_t color) {
+  // 中心点を決める
+  Vector3 center = Multiply(plane.distance, plane.normal);
+
+  Vector3 perpendiculars[4];
+
+  // 法線と垂直なベクトルを一つ求める
+  perpendiculars[0] = Normalize(Perpendicular(plane.normal));
+
+  // ↑の逆ベクトルを求める
+  perpendiculars[1] = {
+      -perpendiculars[0].x,
+      -perpendiculars[0].y,
+      -perpendiculars[0].z,
+  };
+
+  //[0]の法線とクロス積を求める
+  perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);
+
+  // ↑の逆ベクトルを求める
+  perpendiculars[3] = {
+      -perpendiculars[2].x,
+      -perpendiculars[2].y,
+      -perpendiculars[2].z,
+  };
+
+  // 四頂点を求める
+  Vector3 points[4];
+  for (int32_t index = 0; index < 4; ++index) {
+    Vector3 extend = Multiply(2.0f, perpendiculars[index]);
+    Vector3 point = Add(center, extend);
+    points[index] =
+        Transform(Transform(point, viewProjectionMatrix), viewportMatrix);
+  }
+
+  // 矩形を描画
+
+  Novice::DrawLine(static_cast<int>(points[0].x), static_cast<int>(points[0].y),
+                   static_cast<int>(points[2].x), static_cast<int>(points[2].y),
+                   color);
+  Novice::DrawLine(static_cast<int>(points[1].x), static_cast<int>(points[1].y),
+                   static_cast<int>(points[3].x), static_cast<int>(points[3].y),
+                   color);
+  Novice::DrawLine(static_cast<int>(points[2].x), static_cast<int>(points[2].y),
+                   static_cast<int>(points[1].x), static_cast<int>(points[1].y),
+                   color);
+  Novice::DrawLine(static_cast<int>(points[3].x), static_cast<int>(points[3].y),
+                   static_cast<int>(points[0].x), static_cast<int>(points[0].y),
+                   color);
+}
+
+/// <summary>
 /// ベクトルの引き算
 /// </summary>
 /// <param name="v1"></param>
@@ -578,33 +738,6 @@ Vector3 Subtract(const Vector3 &v1, const Vector3 &v2) {
   result.x = v1.x - v2.x;
   result.y = v1.y - v2.y;
   result.z = v1.z - v2.z;
-
-  return result;
-}
-
-/// <summary>
-/// 内積を求める
-/// </summary>
-/// <param name="v1"></param>
-/// <param name="v2"></param>
-/// <returns></returns>
-float Dot(const Vector3 &v1, const Vector3 &v2) {
-  float result;
-
-  result = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-
-  return result;
-}
-
-/// <summary>
-/// 長さを求める
-/// </summary>
-/// <param name="vector"></param>
-/// <returns></returns>
-float Length(const Vector3 &vector) {
-  float result;
-
-  result = sqrtf(Dot(vector, vector));
 
   return result;
 }
@@ -625,6 +758,29 @@ bool IsCollision(const Sphere &s1, const Sphere &s2) {
   return false;
 }
 
+/// <summary>
+/// 球と平面の当たり判定
+/// </summary>
+/// <param name="sphere"></param>
+/// <param name="plane"></param>
+/// <returns></returns>
+bool IsCollision(const Sphere &sphere, const Plane &plane) {
+
+  // 平面と球の中心点の距離を求める
+  float k = Dot(plane.normal, sphere.center) - plane.distance;
+
+  // 絶対値にする
+  if (k < 0) {
+    k *= -1.0f;
+  }
+
+  if (sphere.radius >= k) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
@@ -641,22 +797,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   Vector3 cameraTranslate{0.0f, 1.9f, -6.49f};
   Vector3 cameraRotate{0.26f, 0.0f, 0.0f};
 
-  // 球の色
-  uint32_t color = 0x000000ff;
+  // 色
+  uint32_t color = WHITE;
 
-  Sphere sphere[2] = {
+  Sphere sphere{
+      {0.0f, 0.0f, 0.0f},
+      0.5f,
+  };
 
-      {
-          // 一つ目(動かす方)
-          {0.0f, 0.0f, 0.0f},
-          0.5f,
-      },
-
-      {
-          // 二つ目
-          {1.0f, 0.0f, 0.0f},
-          {0.5f},
-      },
+  Plane plane{
+      {0.0f, 1.0f, 0.0f},
+      0.5f,
   };
 
   // ウィンドウの×ボタンが押されるまでループ
@@ -682,12 +833,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
     // 当たり判定を取る
-    // trueなら赤色にする
-    // falseなら白色
-    if (IsCollision(sphere[0], sphere[1])) {
-      color = 0xff0000ff;
+    if (IsCollision(sphere, plane)) {
+      color = RED;
     } else {
-      color = 0xffffffff;
+      color = WHITE;
     }
 
     ///
@@ -702,18 +851,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     DrawGlid(viewProjectionMatrix, viewportMatrix);
 
     // 動かす方の球
-    DrawSphere(sphere[0], viewProjectionMatrix, viewportMatrix, color);
+    DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, color);
 
-    // 固定されてる球
-    DrawSphere(sphere[1], viewProjectionMatrix, viewportMatrix, 0xffffffff);
+    // 平面
+    DrawPlane(plane, viewProjectionMatrix, viewportMatrix, color);
 
     // UI
     ImGui::Begin("Window");
     ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
-    ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-    ImGui::DragFloat3("SphereTranslate", &sphere[0].center.x, 0.01f);
-    ImGui::DragFloat("SphereRadius", &sphere[0].radius, 0.01f);
+    ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.001f);
+    ImGui::DragFloat3("SphereTranslate", &sphere.center.x, 0.01f);
+    ImGui::DragFloat("SphereRadius", &sphere.radius, 0.01f);
+    ImGui::DragFloat3("Plane.Normal", &plane.normal.x, 0.01f);
+    ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
     ImGui::End();
+
+    plane.normal = Normalize(plane.normal);
 
     ///
     /// ↑描画処理ここまで
