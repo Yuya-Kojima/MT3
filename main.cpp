@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #define _USE_MATH_DEFINES
+#include <algorithm>
 #include <imgui.h>
 #include <math.h>
 
@@ -30,6 +31,10 @@ struct Plane {
 struct Segment {
   Vector3 origin;
   Vector3 diff;
+};
+
+struct Triangle {
+  Vector3 vertices[3]; // 頂点
 };
 
 // 行列の積
@@ -786,6 +791,12 @@ bool IsCollision(const Sphere &sphere, const Plane &plane) {
   }
 }
 
+/// <summary>
+/// 線分と平面の当たり判定
+/// </summary>
+/// <param name="segment"></param>
+/// <param name="plane"></param>
+/// <returns></returns>
 bool IsCollision(const Segment &segment, const Plane &plane) {
 
   float dot = Dot(segment.diff, plane.normal);
@@ -805,6 +816,13 @@ bool IsCollision(const Segment &segment, const Plane &plane) {
   }
 }
 
+/// <summary>
+/// 線分の描画
+/// </summary>
+/// <param name="segment"></param>
+/// <param name="viewProjectionMatrix"></param>
+/// <param name="viewportMatrix"></param>
+/// <param name="color"></param>
 void DrawSegment(const Segment &segment, const Matrix4x4 &viewProjectionMatrix,
                  const Matrix4x4 &viewportMatrix, uint32_t color) {
 
@@ -817,6 +835,152 @@ void DrawSegment(const Segment &segment, const Matrix4x4 &viewProjectionMatrix,
 
   Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y),
                    static_cast<int>(end.x), static_cast<int>(end.y), color);
+}
+
+/// <summary>
+/// 三角形と線分の当たり判定
+/// </summary>
+/// <param name="triangle"></param>
+/// <param name="segment"></param>
+/// <returns></returns>
+bool IsCollision(const Triangle &triangle, const Segment &segment) {
+
+  Vector3 v01 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+  Vector3 v12 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+  Vector3 v20 = Subtract(triangle.vertices[0], triangle.vertices[2]);
+
+  Vector3 normal = Normalize(Cross(v01, v12));
+
+  float dot = Dot(segment.diff, normal);
+
+  // 平行なので衝突しない
+  if (dot == 0.0f) {
+    return false;
+  }
+
+  float d = Dot(triangle.vertices[0], normal);
+
+  float t = (d - Dot(segment.origin, normal)) / dot;
+
+  // 線分の範囲外は衝突しない
+  if (t < 0.0f || t > 1.0f) {
+    return false;
+  }
+
+  Vector3 p = Add(segment.origin, Multiply(t, segment.diff));
+
+  Vector3 v0p = Subtract(p, triangle.vertices[0]);
+  Vector3 v1p = Subtract(p, triangle.vertices[1]);
+  Vector3 v2p = Subtract(p, triangle.vertices[2]);
+
+  Vector3 cross01 = Cross(v01, v1p);
+  Vector3 cross12 = Cross(v12, v2p);
+  Vector3 cross20 = Cross(v20, v0p);
+
+  if (Dot(cross01, normal) >= 0.0f && Dot(cross12, normal) >= 0.0f &&
+      Dot(cross20, normal) >= 0.0f) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+/// <summary>
+/// 三角形の描画
+/// </summary>
+/// <param name="triangle"></param>
+/// <param name="viewProjectionMatrix"></param>
+/// <param name="viewportMatrix"></param>
+/// <param name="color"></param>
+void DrawTriangle(const Triangle &triangle,
+                  const Matrix4x4 viewProjectionMatrix,
+                  const Matrix4x4 viewportMatrix, uint32_t color) {
+
+  Vector3 v0 = Transform(Transform(triangle.vertices[0], viewProjectionMatrix),
+                         viewportMatrix);
+  Vector3 v1 = Transform(Transform(triangle.vertices[1], viewProjectionMatrix),
+                         viewportMatrix);
+  Vector3 v2 = Transform(Transform(triangle.vertices[2], viewProjectionMatrix),
+                         viewportMatrix);
+
+  Novice::DrawTriangle(static_cast<int>(v0.x), static_cast<int>(v0.y),
+                       static_cast<int>(v1.x), static_cast<int>(v1.y),
+                       static_cast<int>(v2.x), static_cast<int>(v2.y), color,
+                       kFillModeWireFrame);
+}
+
+/// <summary>
+/// マウスでカメラ操作
+/// </summary>
+/// <param name="cameraTranslate"></param>
+/// <param name="cameraRotate"></param>
+void UpdateCameraByMouse(Vector3 &cameraTranslate, Vector3 &cameraRotate) {
+  // マウスでカメラ移動// マウス座標を取得
+  // マウス座標取得
+  int mouseX, mouseY;
+  Novice::GetMousePosition(&mouseX, &mouseY);
+
+  // 状態保持
+  static int prevMouseX = mouseX;
+  static int prevMouseY = mouseY;
+  static bool wasRotating = false;
+  static bool wasPanning = false;
+
+  // 左ボタン回転
+  bool isRotating = Novice::IsPressMouse(0); // 左ボタン
+  bool allowRotate =
+      isRotating && !ImGui::IsAnyItemActive() && !ImGui::IsAnyItemHovered();
+
+  // 右ボタン平行移動
+  bool isPanning = Novice::IsPressMouse(1); // 右ボタン
+  bool allowPan =
+      isPanning && !ImGui::IsAnyItemActive() && !ImGui::IsAnyItemHovered();
+
+  // 視点回転（左ドラッグ）
+  if (allowRotate) {
+    if (!wasRotating) {
+      prevMouseX = mouseX;
+      prevMouseY = mouseY;
+    }
+
+    float dx = static_cast<float>(mouseX - prevMouseX);
+    float dy = static_cast<float>(mouseY - prevMouseY);
+
+    cameraRotate.y -= dx * 0.001f;
+    cameraRotate.x -= dy * 0.001f;
+
+    const float piOver2 = 3.141592f / 2.0f;
+    cameraRotate.x = std::clamp(cameraRotate.x, -piOver2, piOver2);
+
+    prevMouseX = mouseX;
+    prevMouseY = mouseY;
+  }
+
+  // カメラ平行移動（右ドラッグ）
+  if (allowPan) {
+    if (!wasPanning) {
+      prevMouseX = mouseX;
+      prevMouseY = mouseY;
+    }
+
+    float dx = static_cast<float>(mouseX - prevMouseX);
+    float dy = static_cast<float>(mouseY - prevMouseY);
+
+    // カメラの向きに応じてX方向とY方向に動くように補正
+    float speed = 0.01f;
+    cameraTranslate.x -= dx * speed;
+    cameraTranslate.y += dy * speed;
+
+    prevMouseX = mouseX;
+    prevMouseY = mouseY;
+  }
+
+  wasRotating = isRotating;
+  wasPanning = isPanning;
+
+  // ホイールズーム
+  ImGuiIO &io = ImGui::GetIO();
+  cameraTranslate.z += io.MouseWheel * 0.5f;
 }
 
 const int kWindowWidth = 1280;
@@ -838,15 +1002,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   // 色
   uint32_t color = WHITE;
 
-  Plane plane{
-      {0.0f, 1.0f, 0.0f},
-      0.5f,
-  };
-
   Segment segment{
       {-0.5, 0.0f, 0.0f},
       {1.0f, 0.5f, 0.0f},
   };
+
+  Triangle triangle;
+
+  triangle.vertices[0] = {-1.0f, 0.0f, 0.0f};
+  triangle.vertices[1] = {0.0f, 1.0f, 0.0f};
+  triangle.vertices[2] = {1.0f, 0.0f, 0.0f};
 
   // ウィンドウの×ボタンが押されるまでループ
   while (Novice::ProcessMessage() == 0) {
@@ -871,11 +1036,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
     // 当たり判定を取る
-    if (IsCollision(segment, plane)) {
+    if (IsCollision(triangle, segment)) {
       color = RED;
     } else {
       color = WHITE;
     }
+
+    UpdateCameraByMouse(cameraTranslate, cameraRotate);
 
     ///
     /// ↑更新処理ここまで
@@ -888,8 +1055,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // グリッド
     DrawGlid(viewProjectionMatrix, viewportMatrix);
 
-    // 平面
-    DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xffffffff);
+    // 三角形
+    DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix, 0xffffffff);
 
     // 線分
     DrawSegment(segment, viewProjectionMatrix, viewportMatrix, color);
@@ -898,13 +1065,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ImGui::Begin("Window");
     ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
     ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.001f);
-    ImGui::DragFloat3("Plane.Normal", &plane.normal.x, 0.01f);
-    ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
+    ImGui::DragFloat3("Triangle.v0", &triangle.vertices[0].x, 0.01f);
+    ImGui::DragFloat3("Triangle.v1", &triangle.vertices[1].x, 0.01f);
+    ImGui::DragFloat3("Triangle.v2", &triangle.vertices[2].x, 0.01f);
     ImGui::DragFloat3("Segment.origin", &segment.origin.x, 0.01f);
     ImGui::DragFloat3("Segment.diff", &segment.diff.x, 0.01f);
     ImGui::End();
-
-    plane.normal = Normalize(plane.normal);
 
     ///
     /// ↑描画処理ここまで
