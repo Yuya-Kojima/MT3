@@ -27,6 +27,11 @@ struct Plane {
   float distance;
 };
 
+struct Segment {
+  Vector3 origin;
+  Vector3 diff;
+};
+
 // 行列の積
 Matrix4x4 Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 
@@ -781,6 +786,39 @@ bool IsCollision(const Sphere &sphere, const Plane &plane) {
   }
 }
 
+bool IsCollision(const Segment &segment, const Plane &plane) {
+
+  float dot = Dot(segment.diff, plane.normal);
+
+  // 平行なので衝突しない
+  if (dot == 0.0f) {
+    return false;
+  }
+
+  float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+
+  // 線分
+  if (t > 0.0f && t <= 1.0f) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+void DrawSegment(const Segment &segment, const Matrix4x4 &viewProjectionMatrix,
+                 const Matrix4x4 &viewportMatrix, uint32_t color) {
+
+  Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix),
+                            viewportMatrix);
+
+  Vector3 end = Transform(
+      Transform(Add(segment.origin, segment.diff), viewProjectionMatrix),
+      viewportMatrix);
+
+  Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y),
+                   static_cast<int>(end.x), static_cast<int>(end.y), color);
+}
+
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
@@ -800,14 +838,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   // 色
   uint32_t color = WHITE;
 
-  Sphere sphere{
-      {0.0f, 0.0f, 0.0f},
-      0.5f,
-  };
-
   Plane plane{
       {0.0f, 1.0f, 0.0f},
       0.5f,
+  };
+
+  Segment segment{
+      {-0.5, 0.0f, 0.0f},
+      {1.0f, 0.5f, 0.0f},
   };
 
   // ウィンドウの×ボタンが押されるまでループ
@@ -833,7 +871,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
     // 当たり判定を取る
-    if (IsCollision(sphere, plane)) {
+    if (IsCollision(segment, plane)) {
       color = RED;
     } else {
       color = WHITE;
@@ -850,20 +888,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // グリッド
     DrawGlid(viewProjectionMatrix, viewportMatrix);
 
-    // 動かす方の球
-    DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, color);
-
     // 平面
-    DrawPlane(plane, viewProjectionMatrix, viewportMatrix, color);
+    DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xffffffff);
+
+    // 線分
+    DrawSegment(segment, viewProjectionMatrix, viewportMatrix, color);
 
     // UI
     ImGui::Begin("Window");
     ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
     ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.001f);
-    ImGui::DragFloat3("SphereTranslate", &sphere.center.x, 0.01f);
-    ImGui::DragFloat("SphereRadius", &sphere.radius, 0.01f);
     ImGui::DragFloat3("Plane.Normal", &plane.normal.x, 0.01f);
     ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
+    ImGui::DragFloat3("Segment.origin", &segment.origin.x, 0.01f);
+    ImGui::DragFloat3("Segment.diff", &segment.diff.x, 0.01f);
     ImGui::End();
 
     plane.normal = Normalize(plane.normal);
