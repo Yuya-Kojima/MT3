@@ -37,6 +37,11 @@ struct Triangle {
   Vector3 vertices[3]; // 頂点
 };
 
+struct AABB {
+  Vector3 min; // 最小点
+  Vector3 max; // 最大点
+};
+
 // 行列の積
 Matrix4x4 Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 
@@ -983,6 +988,114 @@ void UpdateCameraByMouse(Vector3 &cameraTranslate, Vector3 &cameraRotate) {
   cameraTranslate.z += io.MouseWheel * 0.5f;
 }
 
+/// <summary>
+/// AABBの当たり判定
+/// </summary>
+/// <param name="a"></param>
+/// <param name="b"></param>
+/// <returns></returns>
+bool IsCollision(const AABB &a, const AABB &b) {
+
+  if ((a.min.x <= b.max.x && a.max.x >= b.min.x) && // x軸
+      (a.min.y <= b.max.y && a.max.y >= b.min.y) && // y軸
+      (a.min.z <= b.max.z && a.max.z >= b.min.z)) { // z軸
+
+    return true;
+
+  } else {
+    return false;
+  }
+}
+
+/// <summary>
+/// AABB描画
+/// </summary>
+/// <param name="aabb"></param>
+/// <param name="viewProjectionMatrix"></param>
+/// <param name="viewportMatrix"></param>
+/// <param name="color"></param>
+void DrawAABB(const AABB &aabb, const Matrix4x4 &viewProjectionMatrix,
+              const Matrix4x4 &viewportMatrix, uint32_t color) {
+
+  Vector3 vertex[8];
+
+  vertex[0] = {aabb.min.x, aabb.min.y, aabb.min.z};
+  vertex[1] = {aabb.max.x, aabb.min.y, aabb.min.z};
+  vertex[2] = {aabb.min.x, aabb.max.y, aabb.min.z};
+  vertex[3] = {aabb.max.x, aabb.max.y, aabb.min.z};
+  vertex[4] = {aabb.min.x, aabb.min.y, aabb.max.z};
+  vertex[5] = {aabb.max.x, aabb.min.y, aabb.max.z};
+  vertex[6] = {aabb.min.x, aabb.max.y, aabb.max.z};
+  vertex[7] = {aabb.max.x, aabb.max.y, aabb.max.z};
+
+  Vector3 screenVertex[8];
+
+  for (int i = 0; i < 8; i++) {
+    screenVertex[i] =
+        Transform(Transform(vertex[i], viewProjectionMatrix), viewportMatrix);
+  }
+
+  Novice::DrawLine(static_cast<int>(screenVertex[0].x),
+                   static_cast<int>(screenVertex[0].y),
+                   static_cast<int>(screenVertex[1].x),
+                   static_cast<int>(screenVertex[1].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[0].x),
+                   static_cast<int>(screenVertex[0].y),
+                   static_cast<int>(screenVertex[2].x),
+                   static_cast<int>(screenVertex[2].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[0].x),
+                   static_cast<int>(screenVertex[0].y),
+                   static_cast<int>(screenVertex[4].x),
+                   static_cast<int>(screenVertex[4].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[1].x),
+                   static_cast<int>(screenVertex[1].y),
+                   static_cast<int>(screenVertex[3].x),
+                   static_cast<int>(screenVertex[3].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[1].x),
+                   static_cast<int>(screenVertex[1].y),
+                   static_cast<int>(screenVertex[5].x),
+                   static_cast<int>(screenVertex[5].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[2].x),
+                   static_cast<int>(screenVertex[2].y),
+                   static_cast<int>(screenVertex[3].x),
+                   static_cast<int>(screenVertex[3].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[2].x),
+                   static_cast<int>(screenVertex[2].y),
+                   static_cast<int>(screenVertex[6].x),
+                   static_cast<int>(screenVertex[6].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[3].x),
+                   static_cast<int>(screenVertex[3].y),
+                   static_cast<int>(screenVertex[7].x),
+                   static_cast<int>(screenVertex[7].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[4].x),
+                   static_cast<int>(screenVertex[4].y),
+                   static_cast<int>(screenVertex[5].x),
+                   static_cast<int>(screenVertex[5].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[4].x),
+                   static_cast<int>(screenVertex[4].y),
+                   static_cast<int>(screenVertex[6].x),
+                   static_cast<int>(screenVertex[6].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[5].x),
+                   static_cast<int>(screenVertex[5].y),
+                   static_cast<int>(screenVertex[7].x),
+                   static_cast<int>(screenVertex[7].y), color);
+
+  Novice::DrawLine(static_cast<int>(screenVertex[6].x),
+                   static_cast<int>(screenVertex[6].y),
+                   static_cast<int>(screenVertex[7].x),
+                   static_cast<int>(screenVertex[7].y), color);
+}
+
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
@@ -1002,16 +1115,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   // 色
   uint32_t color = WHITE;
 
-  Segment segment{
-      {-0.5, 0.0f, 0.0f},
-      {1.0f, 0.5f, 0.0f},
+  AABB aabb1{
+      .min{-0.5f, -0.5f, -0.5f},
+      .max{0.0f, 0.0f, 0.0f},
   };
 
-  Triangle triangle;
-
-  triangle.vertices[0] = {-1.0f, 0.0f, 0.0f};
-  triangle.vertices[1] = {0.0f, 1.0f, 0.0f};
-  triangle.vertices[2] = {1.0f, 0.0f, 0.0f};
+  AABB aabb2{
+      .min{0.2f, 0.2f, 0.2f},
+      .max{1.0f, 1.0f, 1.0f},
+  };
 
   // ウィンドウの×ボタンが押されるまでループ
   while (Novice::ProcessMessage() == 0) {
@@ -1036,7 +1148,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
     // 当たり判定を取る
-    if (IsCollision(triangle, segment)) {
+    if (IsCollision(aabb1, aabb2)) {
       color = RED;
     } else {
       color = WHITE;
@@ -1055,21 +1167,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // グリッド
     DrawGlid(viewProjectionMatrix, viewportMatrix);
 
-    // 三角形
-    DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix, 0xffffffff);
+    // AABB
+    DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, color);
 
-    // 線分
-    DrawSegment(segment, viewProjectionMatrix, viewportMatrix, color);
+    DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, WHITE);
 
     // UI
     ImGui::Begin("Window");
     ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
     ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.001f);
-    ImGui::DragFloat3("Triangle.v0", &triangle.vertices[0].x, 0.01f);
-    ImGui::DragFloat3("Triangle.v1", &triangle.vertices[1].x, 0.01f);
-    ImGui::DragFloat3("Triangle.v2", &triangle.vertices[2].x, 0.01f);
-    ImGui::DragFloat3("Segment.origin", &segment.origin.x, 0.01f);
-    ImGui::DragFloat3("Segment.diff", &segment.diff.x, 0.01f);
+    ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.01f);
+    ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.01f);
+    ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.01f);
+    ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.01f);
     ImGui::End();
 
     ///
