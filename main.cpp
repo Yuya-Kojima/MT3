@@ -1119,6 +1119,40 @@ bool IsCollision(const AABB &aabb, const Sphere &sphere) {
   }
 }
 
+/// <summary>
+/// AABBと線分の当たり判定
+/// </summary>
+/// <param name="aabb"></param>
+/// <param name="segment"></param>
+/// <returns></returns>
+bool IsCollision(const AABB &aabb, const Segment &segment) {
+
+  float tXMin = (aabb.min.x - segment.origin.x) / segment.diff.x;
+  float tYMin = (aabb.min.y - segment.origin.y) / segment.diff.y;
+  float tZMin = (aabb.min.z - segment.origin.z) / segment.diff.z;
+
+  float tXMax = (aabb.max.x - segment.origin.x) / segment.diff.x;
+  float tYMax = (aabb.max.y - segment.origin.y) / segment.diff.y;
+  float tZMax = (aabb.max.z - segment.origin.z) / segment.diff.z;
+
+  float tNearX = (std::min)(tXMin, tXMax);
+  float tNearY = (std::min)(tYMin, tYMax);
+  float tNearZ = (std::min)(tZMin, tZMax);
+
+  float tFarX = (std::max)(tXMin, tXMax);
+  float tFarY = (std::max)(tXMin, tXMax);
+  float tFarZ = (std::max)(tZMin, tZMax);
+
+  float tMin = (std::max)((std::max)(tNearX, tNearY), tNearZ);
+  float tMax = (std::min)((std::min)(tFarX, tFarY), tFarZ);
+
+  if (tMin <= tMax) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
@@ -1140,12 +1174,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
   AABB aabb{
       .min{-0.5f, -0.5f, -0.5f},
-      .max{0.0f, 0.0f, 0.0f},
+      .max{0.5f, 0.5f, 0.5f},
   };
 
-  Sphere sphere{
-      .center{0.5f, 0.5f, 0.5f},
-      .radius{0.5f},
+  Segment segment{
+      .origin{-0.7f, 0.3f, -0.5f},
+      .diff{2.0f, -0.5f, 0.0f},
   };
 
   // ウィンドウの×ボタンが押されるまでループ
@@ -1179,7 +1213,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     aabb.max.z = (std::max)(aabb.min.z, aabb.max.z);
 
     // 当たり判定を取る
-    if (IsCollision(aabb, sphere)) {
+    if (IsCollision(aabb, segment)) {
       color = RED;
     } else {
       color = WHITE;
@@ -1201,8 +1235,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // AABB
     DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, color);
 
-    // 球
-    DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, WHITE);
+    // 線分
+    DrawSegment(segment, viewProjectionMatrix, viewportMatrix, WHITE);
 
     // UI
     ImGui::Begin("Window");
@@ -1210,8 +1244,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.001f);
     ImGui::DragFloat3("aabb1.min", &aabb.min.x, 0.01f);
     ImGui::DragFloat3("aabb1.max", &aabb.max.x, 0.01f);
-    ImGui::DragFloat3("shpere.center", &sphere.center.x, 0.01f);
-    ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
+    ImGui::DragFloat3("segment.origin", &segment.origin.x, 0.01f);
+    ImGui::DragFloat3("segment.diff", &segment.diff.x, 0.01f);
     ImGui::End();
 
     ///
