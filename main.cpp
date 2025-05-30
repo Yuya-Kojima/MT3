@@ -56,7 +56,7 @@ Matrix4x4 Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 
   result.m[0][3] =
       matrix1.m[0][0] * matrix2.m[0][3] + matrix1.m[0][1] * matrix2.m[1][3] +
-      matrix1.m[0][2] * matrix2.m[2][3] + matrix1.m[3][0] * matrix2.m[3][3];
+      matrix1.m[0][2] * matrix2.m[2][3] + matrix1.m[0][3] * matrix2.m[3][3];
 
   result.m[1][0] =
       matrix1.m[1][0] * matrix2.m[0][0] + matrix1.m[1][1] * matrix2.m[1][0] +
