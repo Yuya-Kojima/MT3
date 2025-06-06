@@ -1119,6 +1119,26 @@ bool IsCollision(const AABB &aabb, const Sphere &sphere) {
   }
 }
 
+float Min(const float &left, const float &right) {
+  if (left > right) {
+    return right;
+  } else if (left < right) {
+    return left;
+  }
+
+  return left;
+}
+
+float Max(const float &left, const float &right) {
+  if (left < right) {
+    return right;
+  } else if (left > right) {
+    return left;
+  }
+
+  return left;
+}
+
 /// <summary>
 /// AABBと線分の当たり判定
 /// </summary>
@@ -1135,16 +1155,20 @@ bool IsCollision(const AABB &aabb, const Segment &segment) {
   float tYMax = (aabb.max.y - segment.origin.y) / segment.diff.y;
   float tZMax = (aabb.max.z - segment.origin.z) / segment.diff.z;
 
-  float tNearX = (std::min)(tXMin, tXMax);
-  float tNearY = (std::min)(tYMin, tYMax);
-  float tNearZ = (std::min)(tZMin, tZMax);
+  float tNearX = Min(tXMin, tXMax);
+  float tNearY = Min(tYMin, tYMax);
+  float tNearZ = Min(tZMin, tZMax);
 
-  float tFarX = (std::max)(tXMin, tXMax);
-  float tFarY = (std::max)(tXMin, tXMax);
-  float tFarZ = (std::max)(tZMin, tZMax);
+  float tFarX = Max(tXMin, tXMax);
+  float tFarY = Max(tYMin, tYMax);
+  float tFarZ = Max(tZMin, tZMax);
 
-  float tMin = (std::max)((std::max)(tNearX, tNearY), tNearZ);
-  float tMax = (std::min)((std::min)(tFarX, tFarY), tFarZ);
+  float tMin = Max(Max(tNearX, tNearY), tNearZ);
+  float tMax = Min(Min(tFarX, tFarY), tFarZ);
+
+  if (tMin > 1.0f || tMax < 0.0f) {
+    return false;
+  }
 
   if (tMin <= tMax) {
     return true;
@@ -1178,7 +1202,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   };
 
   Segment segment{
-      .origin{-0.7f, 0.3f, -0.5f},
+      .origin{-0.7f, 0.3f, 0.0f},
       .diff{2.0f, -0.5f, 0.0f},
   };
 
