@@ -614,7 +614,7 @@ void DrawGlid(const Matrix4x4 &viewProjectionMatrix,
 void DrawSphere(const Sphere &sphere, const Matrix4x4 &viewProjectionMatrix,
                 const Matrix4x4 viewportMatrix, uint32_t color) {
 
-  const uint32_t kSubdivision = 15; // 分割数
+  const uint32_t kSubdivision = 12; // 分割数
   const float kLonEvery =
       static_cast<float>(M_PI) * 2.0f /
       static_cast<float>(kSubdivision); // 経度分割一つ分の角度
@@ -1246,10 +1246,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   Vector3 cameraTranslate{0.0f, 1.9f, -6.49f};
   Vector3 cameraRotate{0.26f, 0.0f, 0.0f};
 
-  Vector3 controlPoint[3]{
-      {-0.8f, 0.58f, 1.0f},
-      {1.76f, 1.0f, -0.3f},
-      {0.94f, -0.7f, 2.3f},
+  //[0]肩
+  //[1]肘
+  //[2]手
+  Vector3 translates[3] = {
+      {0.2f, 1.0f, 0.0f},
+      {0.4f, 0.0f, 0.0f},
+      {0.3f, 0.0f, 0.0f},
+  };
+
+  Vector3 rotates[3] = {
+      {0.0f, 0.0f, -6.8f},
+      {0.0f, 0.0f, -1.4f},
+      {0.0f, 0.0f, 0.0f},
+  };
+
+  Vector3 scales[3] = {
+      {1.0f, 1.0f, 1.0f},
+      {1.0f, 1.0f, 1.0f},
+      {1.0f, 1.0f, 1.0f},
   };
 
   // ウィンドウの×ボタンが押されるまでループ
@@ -1274,15 +1289,39 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Matrix4x4 viewportMatrix = MakeViewportMatrix(
         0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-    // controlPoint描画用のSphere
-    Sphere controlPointSphere[3] = {};
+    Matrix4x4 shoulderMatrix =
+        MakeAffineMatrix(scales[0], rotates[0], translates[0]);
 
-    for (int i = 0; i < 3; i++) {
-      controlPointSphere[i].center = controlPoint[i];
-      controlPointSphere[i].radius = 0.01f;
-    }
+    Matrix4x4 elbowMatrix = Multiply(
+        MakeAffineMatrix(scales[1], rotates[1], translates[1]), shoulderMatrix);
+
+    Matrix4x4 handMatrix = Multiply(
+        MakeAffineMatrix(scales[2], rotates[2], translates[2]), elbowMatrix);
+
+    Sphere shoulder;
+    shoulder.center = {shoulderMatrix.m[3][0], shoulderMatrix.m[3][1],
+                       shoulderMatrix.m[3][2]};
+    shoulder.radius = 0.05f;
+
+    Sphere elbow;
+    elbow.center = {elbowMatrix.m[3][0], elbowMatrix.m[3][1],
+                    elbowMatrix.m[3][2]};
+    elbow.radius = 0.05f;
+
+    Sphere hand;
+    hand.center = {handMatrix.m[3][0], handMatrix.m[3][1], handMatrix.m[3][2]};
+    hand.radius = 0.05f;
 
     UpdateCameraByMouse(cameraTranslate, cameraRotate);
+
+    Vector3 screenShoulder = Transform(
+        Transform(shoulder.center, viewProjectionMatrix), viewportMatrix);
+
+    Vector3 screenElbow = Transform(
+        Transform(elbow.center, viewProjectionMatrix), viewportMatrix);
+
+    Vector3 screenHand =
+        Transform(Transform(hand.center, viewProjectionMatrix), viewportMatrix);
 
     ///
     /// ↑更新処理ここまで
@@ -1295,23 +1334,35 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // グリッド
     DrawGlid(viewProjectionMatrix, viewportMatrix);
 
-    // ベジエ曲線
-    DrawBezier(controlPoint[0], controlPoint[1], controlPoint[2],
-               viewProjectionMatrix, viewportMatrix, 0x0000ffff);
+    // つなげる線
+    Novice::DrawLine(static_cast<int>(screenShoulder.x),
+                     static_cast<int>(screenShoulder.y),
+                     static_cast<int>(screenElbow.x),
+                     static_cast<int>(screenElbow.y), 0xffffffff);
 
-    // controlPointを球で描画
-    for (int i = 0; i < 3; i++) {
-      DrawSphere(controlPointSphere[i], viewProjectionMatrix, viewportMatrix,
-                 0x000000ff);
-    }
+    Novice::DrawLine(static_cast<int>(screenElbow.x),
+                     static_cast<int>(screenElbow.y),
+                     static_cast<int>(screenHand.x),
+                     static_cast<int>(screenHand.y), 0xffffffff);
+
+    // 各部位を球で描画
+    DrawSphere(shoulder, viewProjectionMatrix, viewportMatrix, 0xff0000ff);
+    DrawSphere(elbow, viewProjectionMatrix, viewportMatrix, 0x00ff00ff);
+    DrawSphere(hand, viewProjectionMatrix, viewportMatrix, 0x0000fffff);
 
     // UI
     ImGui::Begin("Window");
     ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
     ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.001f);
-    ImGui::DragFloat3("controlPoint[0]", &controlPoint[0].x, 0.01f);
-    ImGui::DragFloat3("controlPoint[1]", &controlPoint[1].x, 0.01f);
-    ImGui::DragFloat3("controlPoint[2]", &controlPoint[2].x, 0.01f);
+    ImGui::DragFloat3("translate[0]", &translates[0].x, 0.01f);
+    ImGui::DragFloat3("rotate[0]", &rotates[0].x, 0.01f);
+    ImGui::DragFloat3("scale[0]", &scales[0].x, 0.01f);
+    ImGui::DragFloat3("translate[1]", &translates[1].x, 0.01f);
+    ImGui::DragFloat3("rotate[1]", &rotates[1].x, 0.01f);
+    ImGui::DragFloat3("scale[1]", &scales[1].x, 0.01f);
+    ImGui::DragFloat3("translate[2]", &translates[2].x, 0.01f);
+    ImGui::DragFloat3("rotate[2]", &rotates[2].x, 0.01f);
+    ImGui::DragFloat3("scale[2]", &scales[2].x, 0.01f);
     ImGui::End();
 
     ///
