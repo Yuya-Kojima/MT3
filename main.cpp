@@ -1177,6 +1177,59 @@ bool IsCollision(const AABB &aabb, const Segment &segment) {
   }
 }
 
+/// <summary>
+/// 線形補完
+/// </summary>
+/// <param name="v1"></param>
+/// <param name="v2"></param>
+/// <param name="t"></param>
+/// <returns></returns>
+Vector3 Lerp(const Vector3 &v1, const Vector3 &v2, float t) {
+
+  Vector3 result;
+
+  result.x = t * v1.x + (1.0f - t) * v2.x;
+  result.y = t * v1.y + (1.0f - t) * v2.y;
+  result.z = t * v1.z + (1.0f - t) * v2.z;
+
+  return result;
+}
+
+/// <summary>
+/// 三次元ベジエ曲線描画
+/// </summary>
+/// <param name="controlPoint0"></param>
+/// <param name="controlPoint1"></param>
+/// <param name="controlPoint2"></param>
+/// <param name="viewProjectionMatrix"></param>
+/// <param name="viewportMatrix"></param>
+/// <param name="color"></param>
+void DrawBezier(const Vector3 &controlPoint0, const Vector3 &controlPoint1,
+                const Vector3 &controlPoint2,
+                const Matrix4x4 viewProjectionMatrix,
+                const Matrix4x4 &viewportMatrix, uint32_t color) {
+
+  for (int i = 0; i < 32; i++) {
+    float t[2] = {i / 32.0f, (i + 1) / 32.0f};
+
+    Vector3 p0p1[2] = {Lerp(controlPoint0, controlPoint1, t[0]),
+                       Lerp(controlPoint0, controlPoint1, t[1])};
+    Vector3 p1p2[2] = {Lerp(controlPoint1, controlPoint2, t[0]),
+                       Lerp(controlPoint1, controlPoint2, t[1])};
+
+    Vector3 p[2] = {Lerp(p0p1[0], p1p2[0], t[0]), Lerp(p0p1[1], p1p2[1], t[1])};
+
+    Vector3 screenP[2] = {
+        Transform(Transform(p[0], viewProjectionMatrix), viewportMatrix),
+        Transform(Transform(p[1], viewProjectionMatrix), viewportMatrix),
+    };
+
+    Novice::DrawLine(
+        static_cast<int>(screenP[0].x), static_cast<int>(screenP[0].y),
+        static_cast<int>(screenP[1].x), static_cast<int>(screenP[1].y), color);
+  }
+}
+
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
@@ -1193,17 +1246,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   Vector3 cameraTranslate{0.0f, 1.9f, -6.49f};
   Vector3 cameraRotate{0.26f, 0.0f, 0.0f};
 
-  // 色
-  uint32_t color = WHITE;
-
-  AABB aabb{
-      .min{-0.5f, -0.5f, -0.5f},
-      .max{0.5f, 0.5f, 0.5f},
-  };
-
-  Segment segment{
-      .origin{-0.7f, 0.3f, 0.0f},
-      .diff{2.0f, -0.5f, 0.0f},
+  Vector3 controlPoint[3]{
+      {-0.8f, 0.58f, 1.0f},
+      {1.76f, 1.0f, -0.3f},
+      {0.94f, -0.7f, 2.3f},
   };
 
   // ウィンドウの×ボタンが押されるまでループ
@@ -1228,19 +1274,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Matrix4x4 viewportMatrix = MakeViewportMatrix(
         0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-    // minとmaxが入れ替わらないように
-    aabb.min.x = (std::min)(aabb.min.x, aabb.max.x);
-    aabb.max.x = (std::max)(aabb.min.x, aabb.max.x);
-    aabb.min.y = (std::min)(aabb.min.y, aabb.max.y);
-    aabb.max.y = (std::max)(aabb.min.y, aabb.max.y);
-    aabb.min.z = (std::min)(aabb.min.z, aabb.max.z);
-    aabb.max.z = (std::max)(aabb.min.z, aabb.max.z);
+    // controlPoint描画用のSphere
+    Sphere controlPointSphere[3] = {};
 
-    // 当たり判定を取る
-    if (IsCollision(aabb, segment)) {
-      color = RED;
-    } else {
-      color = WHITE;
+    for (int i = 0; i < 3; i++) {
+      controlPointSphere[i].center = controlPoint[i];
+      controlPointSphere[i].radius = 0.01f;
     }
 
     UpdateCameraByMouse(cameraTranslate, cameraRotate);
@@ -1256,20 +1295,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // グリッド
     DrawGlid(viewProjectionMatrix, viewportMatrix);
 
-    // AABB
-    DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, color);
+    // ベジエ曲線
+    DrawBezier(controlPoint[0], controlPoint[1], controlPoint[2],
+               viewProjectionMatrix, viewportMatrix, 0x0000ffff);
 
-    // 線分
-    DrawSegment(segment, viewProjectionMatrix, viewportMatrix, WHITE);
+    // controlPointを球で描画
+    for (int i = 0; i < 3; i++) {
+      DrawSphere(controlPointSphere[i], viewProjectionMatrix, viewportMatrix,
+                 0x000000ff);
+    }
 
     // UI
     ImGui::Begin("Window");
     ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
     ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.001f);
-    ImGui::DragFloat3("aabb1.min", &aabb.min.x, 0.01f);
-    ImGui::DragFloat3("aabb1.max", &aabb.max.x, 0.01f);
-    ImGui::DragFloat3("segment.origin", &segment.origin.x, 0.01f);
-    ImGui::DragFloat3("segment.diff", &segment.diff.x, 0.01f);
+    ImGui::DragFloat3("controlPoint[0]", &controlPoint[0].x, 0.01f);
+    ImGui::DragFloat3("controlPoint[1]", &controlPoint[1].x, 0.01f);
+    ImGui::DragFloat3("controlPoint[2]", &controlPoint[2].x, 0.01f);
     ImGui::End();
 
     ///
